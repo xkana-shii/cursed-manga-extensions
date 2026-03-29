@@ -74,7 +74,7 @@ open class NHentai(
         } catch (_: IOException) {
             NHConfig(
                 (1..4).map{ n -> "https://i$n.nhentai.net"}.toList(),
-                (1..4).map{ n -> "https://i$n.nhentai.net"}.toList(),
+                (1..4).map{ n -> "https://t$n.nhentai.net"}.toList(),
             )
         }
 
