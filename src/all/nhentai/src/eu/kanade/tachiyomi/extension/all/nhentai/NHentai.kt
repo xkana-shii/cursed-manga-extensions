@@ -20,12 +20,9 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
-import keiyoushi.lib.randomua.addRandomUAPreferenceToScreen
-import keiyoushi.lib.randomua.getPrefCustomUA
-import keiyoushi.lib.randomua.getPrefUAType
+import keiyoushi.lib.randomua.addRandomUAPreference
 import keiyoushi.lib.randomua.setRandomUserAgent
 import keiyoushi.utils.getPreferencesLazy
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -56,14 +53,14 @@ open class NHentai(
 
     override val client: OkHttpClient by lazy {
         network.cloudflareClient.newBuilder()
-            .setRandomUserAgent(
-                userAgentType = preferences.getPrefUAType(),
-                customUA = preferences.getPrefCustomUA(),
-                filterInclude = listOf("chrome"),
-            )
             .rateLimit(4)
             .build()
     }
+
+    override fun headersBuilder() = super.headersBuilder()
+        .setRandomUserAgent(
+            filterInclude = listOf("chrome"),
+        )
 
     private var displayFullTitle: Boolean = when (preferences.getString(TITLE_PREF, "full")) {
         "full" -> true
@@ -93,7 +90,7 @@ open class NHentai(
             }
         }.also(screen::addPreference)
 
-        addRandomUAPreferenceToScreen(screen)
+        screen.addRandomUAPreference()
     }
 
     override fun latestUpdatesRequest(page: Int) = GET(if (nhLang.isBlank()) "$baseUrl/?page=$page" else "$baseUrl/language/$nhLang/?page=$page", headers)
@@ -102,9 +99,7 @@ open class NHentai(
 
     override fun latestUpdatesFromElement(element: Element) = SManga.create().apply {
         setUrlWithoutDomain(element.select("a").attr("href"))
-        title = element.select("a > div").text().replace("\"", "").let {
-            if (displayFullTitle) it.trim() else it.shortenTitle()
-        }
+        title = element.select("a > div").text().replace("\"", "").shortenTitle()
         thumbnail_url = element.selectFirst(".cover img")!!.let { img ->
             if (img.hasAttr("data-src")) img.attr("abs:data-src") else img.attr("abs:src")
         }
@@ -212,7 +207,7 @@ open class NHentai(
         val data = document.getHentaiData()
         val cdnUrl = document.getCdnUrls(thumbnail = true).random()
         return SManga.create().apply {
-            title = if (displayFullTitle) data.title.english ?: data.title.japanese ?: data.title.pretty!! else data.title.pretty ?: (data.title.english ?: data.title.japanese)!!.shortenTitle()
+            title = data.title.pretty ?: (data.title.english ?: data.title.japanese)!!.shortenTitle()
             thumbnail_url = "https://$cdnUrl/galleries/${data.media_id}/1t.${data.images.pages[0].extension}"
             status = SManga.COMPLETED
             artist = getArtists(data)
@@ -230,13 +225,15 @@ open class NHentai(
         }
     }
 
+    override fun getMangaUrl(manga: SManga) = "$baseUrl${manga.url}"
+
     override fun chapterListRequest(manga: SManga): Request = GET("$baseUrl${manga.url}", headers)
 
     override fun chapterListParse(response: Response): List<SChapter> {
         val data = response.asJsoup().getHentaiData()
         return listOf(
             SChapter.create().apply {
-                name = "Chapter"
+                name = "Chapter 1"
                 scanlator = getGroups(data)
                 date_upload = data.upload_date * 1000
                 setUrlWithoutDomain(response.request.url.encodedPath)
