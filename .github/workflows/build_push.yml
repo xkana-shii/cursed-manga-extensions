@@ -110,7 +110,7 @@ jobs:
   publish:
     name: Publish extension repo
     needs: [prepare, build]
-    if: github.repository == 'yuzono/cursed-manga-extensions'
+    if: github.repository == 'xkana-shii/cursed-manga-extensions'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -144,7 +144,7 @@ jobs:
       - name: Checkout repo branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          repository: yuzono/cursed-manga-repo
+          repository: xkana-shii/manga-repo
           token: ${{ secrets.BOT_PAT }}
           ref: repo
           path: repo
@@ -169,4 +169,4 @@ jobs:
 
       - name: Purge cached index on jsDelivr
         run: |
-          curl https://purge.jsdelivr.net/gh/yuzono/cursed-manga-repo@repo/index.min.json
+          curl https://purge.jsdelivr.net/gh/xkana-shii/manga-repo@repo/index.min.json
