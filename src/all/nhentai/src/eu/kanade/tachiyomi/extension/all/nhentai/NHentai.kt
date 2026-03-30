@@ -53,10 +53,12 @@ open class NHentai(
 
     private val json: Json by injectLazy()
 
+    private val webViewCookieManager: CookieManager by lazy { CookieManager.getInstance() }
+    var accessToken: String = ""
+
     private val preferences: SharedPreferences by getPreferencesLazy()
 
-    var accessToken: String = ""
-    override val client: OkHttpClient by lazy {
+        override val client: OkHttpClient by lazy {
         network.cloudflareClient.newBuilder().setRandomUserAgent(
             userAgentType = preferences.getPrefUAType(),
             customUA = preferences.getPrefCustomUA(),
@@ -65,7 +67,6 @@ open class NHentai(
             .addNetworkInterceptor(::authorizationInterceptor).build()
     }
 
-    private val webViewCookieManager: CookieManager by lazy { CookieManager.getInstance() }
     fun authorizationInterceptor(chain: Interceptor.Chain): Response {
         var request = chain.request()
         if (request.url.toString().contains("/favorites")) {
