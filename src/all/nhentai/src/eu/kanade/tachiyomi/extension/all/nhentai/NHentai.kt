@@ -113,7 +113,7 @@ open class NHentai(
     override fun latestUpdatesParse(response: Response): MangasPage {
         val res = response.parseAs<ResultNHentai>()
         val mangas = res.result.map { parseSearchData(it) }
-        val hasNextPage = mangas.size == res.per_page
+        val hasNextPage = mangas.size.toLong() == res.per_page
         return MangasPage(mangas, hasNextPage)
     }
 
@@ -131,7 +131,7 @@ open class NHentai(
     override fun popularMangaParse(response: Response): MangasPage {
         val res = response.parseAs<ResultNHentai>()
         val mangas = res.result.map { parseSearchData(it) }
-        val hasNextPage = mangas.size == res.per_page
+        val hasNextPage = mangas.size.toLong() == res.per_page
         return MangasPage(mangas, hasNextPage)
     }
 
