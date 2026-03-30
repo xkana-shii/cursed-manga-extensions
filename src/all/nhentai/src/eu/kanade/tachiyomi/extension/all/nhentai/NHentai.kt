@@ -18,11 +18,8 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
-import eu.kanade.tachiyomi.source.online.ParsedHttpSource
-import keiyoushi.lib.randomua.addRandomUAPreferenceToScreen
-import keiyoushi.lib.randomua.getPrefCustomUA
-import keiyoushi.lib.randomua.getPrefUAType
-import keiyoushi.lib.randomua.setRandomUserAgent
+import eu.kanade.tachiyomi.source.online.HttpSource
+import keiyoushi.lib.randomua.addRandomUAPreference
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAs
 import kotlinx.serialization.json.Json
@@ -31,15 +28,13 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
 import uy.kohesive.injekt.injectLazy
 import java.io.IOException
 
 open class NHentai(
     override val lang: String,
     private val nhLang: String,
-) : ParsedHttpSource(),
+) : HttpSource(),
     ConfigurableSource {
 
     final override val baseUrl = "https://nhentai.net"
@@ -58,13 +53,11 @@ open class NHentai(
 
     private val preferences: SharedPreferences by getPreferencesLazy()
 
-        override val client: OkHttpClient by lazy {
-        network.cloudflareClient.newBuilder().setRandomUserAgent(
-            userAgentType = preferences.getPrefUAType(),
-            customUA = preferences.getPrefCustomUA(),
-            filterInclude = listOf("chrome"),
-        ).rateLimit(4)
-            .addNetworkInterceptor(::authorizationInterceptor).build()
+    override val client: OkHttpClient by lazy {
+        network.cloudflareClient.newBuilder()
+            .rateLimit(4)
+            .addNetworkInterceptor(::authorizationInterceptor)
+            .build()
     }
 
     fun authorizationInterceptor(chain: Interceptor.Chain): Response {
@@ -101,6 +94,11 @@ open class NHentai(
             )
         }
     }
+    val imageServer
+        get() = nhConfig.image_servers.random()
+
+    val thumbServer
+        get() = nhConfig.thumb_servers.random()
 
     private var displayFullTitle: Boolean = when (preferences.getString(TITLE_PREF, "full")) {
         "full" -> true
@@ -128,7 +126,7 @@ open class NHentai(
             }
         }.also(screen::addPreference)
 
-        addRandomUAPreferenceToScreen(screen)
+        screen.addRandomUAPreference()
     }
 
     override fun latestUpdatesRequest(page: Int) = GET(if (nhLang.isBlank()) "$apiUrl/galleries?page=$page" else "$apiUrl/search?query=language%3A$nhLang&page=$page", headers)
@@ -140,12 +138,6 @@ open class NHentai(
         val hasNextPage = (res.num_pages != null && res.num_pages > page) || (res.num_pages == null && res.total < page * res.per_page)
         return MangasPage(mangas, hasNextPage)
     }
-
-    override fun latestUpdatesSelector(): String = throw UnsupportedOperationException()
-
-    override fun latestUpdatesFromElement(element: Element) = throw UnsupportedOperationException()
-
-    override fun latestUpdatesNextPageSelector() = throw UnsupportedOperationException()
 
     override fun popularMangaRequest(page: Int) = GET(
         if (nhLang.isBlank()) "$apiUrl/search/?query=\"\"&sort=popular&page=$page" else "$apiUrl/search?sort=popular&query=language%3A$nhLang&page=$page",
@@ -159,12 +151,6 @@ open class NHentai(
         val hasNextPage = (res.num_pages != null && res.num_pages > page) || (res.num_pages == null && res.total < page * res.per_page)
         return MangasPage(mangas, hasNextPage)
     }
-
-    override fun popularMangaFromElement(element: Element) = throw UnsupportedOperationException()
-
-    override fun popularMangaSelector() = throw UnsupportedOperationException()
-
-    override fun popularMangaNextPageSelector() = throw UnsupportedOperationException()
 
     override suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage = when {
         query.startsWith(PREFIX_ID_SEARCH) -> {
@@ -236,19 +222,12 @@ open class NHentai(
         return MangasPage(mangas, hasNextPage)
     }
 
-    override fun searchMangaFromElement(element: Element) = throw UnsupportedOperationException()
-
-    override fun searchMangaSelector() = throw UnsupportedOperationException()
-
-    override fun searchMangaNextPageSelector() = throw UnsupportedOperationException()
-
-    override fun mangaDetailsRequest(manga: SManga): Request = searchMangaByIdRequest(manga.url.split("/")[2])
-
+    override fun mangaDetailsRequest(manga: SManga): Request = searchMangaByIdRequest(manga.url.removeSurrounding("/g/", "/"))
     override fun mangaDetailsParse(response: Response): SManga = parseData(response.parseAs<Hentai>())
 
-    override fun mangaDetailsParse(document: Document): SManga = throw UnsupportedOperationException()
+    override fun getMangaUrl(manga: SManga) = "$baseUrl${manga.url}/"
 
-    override fun chapterListRequest(manga: SManga): Request = GET("$apiUrl/galleries/${manga.url.split("/")[2]}", headers)
+    override fun chapterListRequest(manga: SManga): Request = GET("$apiUrl/galleries/${manga.url.removeSurrounding("/g/", "/")}", headers)
 
     override fun chapterListParse(response: Response): List<SChapter> {
         val data = response.parseAs<Hentai>()
@@ -262,27 +241,17 @@ open class NHentai(
         )
     }
 
-    override fun chapterFromElement(element: Element) = throw UnsupportedOperationException()
-
-    override fun chapterListSelector() = throw UnsupportedOperationException()
-
-    override suspend fun getPageList(chapter: SChapter): List<Page> {
-        val cdnUrls = nhConfig.image_servers
-        val res = client.newCall(
-            GET("$apiUrl/galleries/${chapter.url.split("/")[2]}", headers),
-        )
-            .execute()
-            .parseAs<Hentai>()
-
-        return res.pages.mapIndexed { i, image ->
-            Page(
-                index = i,
-                imageUrl = "${cdnUrls.random()}/${image.path}",
-            )
-        }
+    override fun pageListRequest(chapter: SChapter): Request {
+        val id = chapter.url.removeSurrounding("/g/", "/")
+        return GET("$apiUrl/galleries/$id", headers)
     }
 
-    override fun pageListParse(document: Document): List<Page> = throw UnsupportedOperationException()
+    override fun pageListParse(response: Response): List<Page> {
+        val data = response.parseAs<Hentai>(json)
+        return data.pages.mapIndexed { i, page ->
+            Page(i, imageUrl = "$imageServer/${page.path}")
+        }
+    }
 
     fun parseSearchData(data: SearchHentai): SManga {
         val cdnUrl = nhConfig.thumb_servers.random()
@@ -322,6 +291,8 @@ open class NHentai(
         }
     }
 
+    override fun imageUrlParse(response: Response): String = throw UnsupportedOperationException()
+
     override fun getFilterList(): FilterList = FilterList(
         Filter.Header("Separate tags with commas (,)"),
         Filter.Header("Prepend with dash (-) to exclude"),
@@ -356,8 +327,6 @@ open class NHentai(
     open class AdvSearchEntryFilter(name: String) : Filter.Text(name)
 
     class OffsetPageFilter : Filter.Text("Offset results by # pages")
-
-    override fun imageUrlParse(document: Document) = throw UnsupportedOperationException()
 
     private class FavoriteFilter : Filter.CheckBox("Show favorites only", false)
 
