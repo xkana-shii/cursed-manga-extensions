@@ -246,7 +246,7 @@ open class NHentai(
         return listOf(
             SChapter.create().apply {
                 url = "/g/${data.id}/"
-                name = "Chapter"
+                name = "Chapter 1"
                 scanlator = getGroups(data)
                 date_upload = data.upload_date * 1000
             },
