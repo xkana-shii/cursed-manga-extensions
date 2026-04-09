@@ -38,7 +38,7 @@ class Hentai(
     @SerialName("num_pages") val numPages: Int,
 ) {
     fun toSChapter() = SChapter.create().apply {
-        name = "Chapter"
+        name = "Chapter 1"
         scanlator = NHUtils.getGroups(this@Hentai)
         date_upload = uploadDate * 1000
         url = "/g/$id/"
