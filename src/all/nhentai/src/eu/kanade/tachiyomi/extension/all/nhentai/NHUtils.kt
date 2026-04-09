@@ -3,12 +3,12 @@ package eu.kanade.tachiyomi.extension.all.nhentai
 object NHUtils {
     fun getArtists(data: Hentai): String {
         val artists = data.tags.filter { it.type == "artist" }
-        return artists.joinToString(", ") { it.name }
+        return artists.joinToString { it.name }
     }
 
     fun getGroups(data: Hentai): String? {
         val groups = data.tags.filter { it.type == "group" }
-        return groups.joinToString(", ") { it.name }.takeIf { it.isNotBlank() }
+        return groups.joinToString { it.name }.takeIf { it.isNotBlank() }
     }
 
     fun getTagDescription(data: Hentai): String {
@@ -29,6 +29,6 @@ object NHUtils {
 
     fun getTags(data: Hentai): String {
         val tags = data.tags.filter { it.type == "tag" }
-        return tags.map { it.name }.sorted().joinToString(", ")
+        return tags.map { it.name }.sorted().joinToString()
     }
 }
