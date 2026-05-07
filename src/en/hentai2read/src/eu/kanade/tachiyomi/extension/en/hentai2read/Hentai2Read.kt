@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
 import eu.kanade.tachiyomi.util.asJsoup
 import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -39,7 +40,7 @@ class Hentai2Read : ParsedHttpSource() {
         const val PREFIX_ID_SEARCH = "id:"
 
         val pagesUrlPattern by lazy {
-            Pattern.compile("""'images' : \[\"(.*?)[,]?\"\]""")
+            Pattern.compile("""'images' : \["(.*?),?"]""")
         }
 
         lateinit var nextSearchPage: String
@@ -67,7 +68,14 @@ class Hentai2Read : ParsedHttpSource() {
 
     override fun latestUpdatesNextPageSelector() = popularMangaNextPageSelector()
 
-    override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> = if (query.startsWith(PREFIX_ID_SEARCH)) {
+    override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> = if (query.startsWith("https://")) {
+        val url = query.toHttpUrl()
+        if (url.host != baseUrl.toHttpUrl().host) {
+            throw Exception("Unsupported url")
+        }
+        val id = url.pathSegments[0].takeIf(String::isNotBlank) ?: throw Exception("Unsupported url")
+        fetchSearchManga(page, "$PREFIX_ID_SEARCH$id", filters)
+    } else if (query.startsWith(PREFIX_ID_SEARCH)) {
         val id = query.removePrefix(PREFIX_ID_SEARCH)
         client.newCall(GET("$baseUrl/$id/", headers)).asObservableSuccess()
             .map { MangasPage(listOf(mangaDetailsParse(it).apply { url = "/$id/" }), false) }
@@ -164,7 +172,7 @@ class Hentai2Read : ParsedHttpSource() {
         manga.artist = infoElement.select("li:contains(Artist) > a").text()
         manga.genre = infoElement.select("li:contains(Category) > a, li:contains(Content) > a").joinToString(", ") { it.text() }
         manga.description = buildDescription(infoElement)
-        manga.status = infoElement.select("li:contains(Status) > a").text().orEmpty().let { parseStatus(it) }
+        manga.status = infoElement.select("li:contains(Status) > a").text().let { parseStatus(it) }
         manga.thumbnail_url = document.select("a#js-linkNext img").attr("src")
         manga.title = document.select("h3.block-title > a").first()!!.ownText().trim()
         return manga
@@ -251,7 +259,7 @@ class Hentai2Read : ParsedHttpSource() {
             }.timeInMillis
 
             else -> {
-                return 0
+                0
             }
         }
     }
