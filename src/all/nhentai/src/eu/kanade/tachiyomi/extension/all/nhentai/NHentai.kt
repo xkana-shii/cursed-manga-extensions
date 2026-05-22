@@ -213,6 +213,16 @@ open class NHentai(
     // Search
 
     override suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage = when {
+        query.startsWith("https://") -> {
+            val url = query.toHttpUrl()
+            if (url.host != baseUrl.toHttpUrl().host) {
+                throw Exception("Unsupported url")
+            }
+            if (url.pathSegments.size < 2) {
+                throw Exception("Unsupported url")
+            }
+            getSearchManga(page, "$PREFIX_ID_SEARCH${url.pathSegments[1]}", filters)
+        }
         query.startsWith(PREFIX_ID_SEARCH) -> {
             val id = query.removePrefix(PREFIX_ID_SEARCH)
             client.newCall(searchMangaByIdRequest(id)).await().use { searchMangaByIdParse(it) }
