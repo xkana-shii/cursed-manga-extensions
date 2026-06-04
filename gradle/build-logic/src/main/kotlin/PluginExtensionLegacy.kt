@@ -58,7 +58,7 @@ class PluginExtensionLegacy : Plugin<Project> {
 
             defaultConfig {
                 applicationIdSuffix = project.parent?.name + "." + project.name
-                versionCode = if (theme == null) extVersionCode else theme.baseVersionCode + overrideVersionCode
+                versionCode = kmkVersionCode + if (theme == null) extVersionCode else theme.baseVersionCode + overrideVersionCode
                 versionName = "1.4.$versionCode"
                 base {
                     archivesName.set("tachiyomi-$applicationIdSuffix-v$versionName")
@@ -172,6 +172,11 @@ private val Project.extName: String
 
 private val Project.extVersionCode: Int
     get() = extra.get("extVersionCode") as Int
+
+// KMK -->
+private val Project.kmkVersionCode: Int
+    get() = extra.getOrNull("kmkVersionCode") as? Int ?: 0
+// KMK <--
 
 private val Project.extClass: String
     get() = extra.get("extClass") as String
