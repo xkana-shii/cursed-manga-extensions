@@ -65,7 +65,7 @@ abstract class EHentai(
     private fun String.shortenTitle() = this.replace(shortenTitleRegex, "").trim()
 
     // true if lang is a "natural human language"
-    private fun isLangNatural(): Boolean = lang !in listOf("none", "other")
+    private fun isLangNatural(): Boolean = lang !in listOf("all", "none", "other")
 
     private fun genericMangaParse(response: Response): MangasPage {
         val doc = response.asJsoup()
@@ -172,7 +172,7 @@ abstract class EHentai(
         var modifiedQuery = when {
             !isLangNatural() -> query
             query.isBlank() -> languageTag(enforceLanguageFilter)
-            else -> languageTag(enforceLanguageFilter).let { if (it.isNotEmpty()) "$query,$it" else query }
+            else -> languageTag(enforceLanguageFilter).let { if (it.isNotEmpty()) "$it,$query" else query }
         }
         filters.filterIsInstance<TextFilter>().forEach { filter ->
             if (filter.state.isNotEmpty()) {
@@ -215,7 +215,11 @@ abstract class EHentai(
         return exGet(uri.toString(), page)
     }
 
-    override fun latestUpdatesRequest(page: Int) = exGet(baseUrl, page)
+    override fun latestUpdatesRequest(page: Int) = if (isLangNatural()) {
+        exGet("$baseUrl/?f_search=${languageTag()}", page)
+    } else {
+        exGet(baseUrl, page)
+    }
 
     override fun popularMangaParse(response: Response) = genericMangaParse(response)
     override fun searchMangaParse(response: Response) = genericMangaParse(response)
@@ -599,7 +603,7 @@ abstract class EHentai(
                 AdvancedOption("Only Show Galleries With Torrents", "f_sto"),
                 AdvancedOption("Search Low-Power Tags", "f_sdt1"),
                 AdvancedOption("Search Downvoted Tags", "f_sdt2"),
-                AdvancedOption("Show Expunged Galleries", "f_sh", true),
+                AdvancedOption("Show Expunged Galleries", "f_sh", false),
                 RatingOption(),
                 MinPagesOption(),
                 MaxPagesOption(),

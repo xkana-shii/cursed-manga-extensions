@@ -20,6 +20,7 @@ class EHFactory : SourceFactory {
         EHentaiEs(),
         EHentaiTh(),
         EHentaiVi(),
+        EHentaiAll(),
         EHentaiNone(),
         EHentaiOther(),
     )
@@ -43,5 +44,6 @@ class EHentaiRu : EHentai("ru", "russian")
 class EHentaiEs : EHentai("es", "spanish")
 class EHentaiTh : EHentai("th", "thai")
 class EHentaiVi : EHentai("vi", "vietnamese")
+class EHentaiAll : EHentai("all", "all")
 class EHentaiNone : EHentai("none", "n/a")
 class EHentaiOther : EHentai("other", "other")
