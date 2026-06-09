@@ -13,7 +13,6 @@ import eu.kanade.tachiyomi.extension.all.nhentai.NHUtils.getTagDescription
 import eu.kanade.tachiyomi.extension.all.nhentai.NHUtils.getTags
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.await
-import eu.kanade.tachiyomi.network.interceptor.rateLimitHost
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
@@ -25,6 +24,7 @@ import eu.kanade.tachiyomi.source.model.UpdateStrategy
 import eu.kanade.tachiyomi.source.online.HttpSource
 import keiyoushi.lib.randomua.addRandomUAPreference
 import keiyoushi.lib.randomua.setRandomUserAgent
+import keiyoushi.network.rateLimit
 import keiyoushi.utils.firstInstanceOrNull
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAs
@@ -42,6 +42,7 @@ import uy.kohesive.injekt.injectLazy
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 open class NHentai(
     override val lang: String,
@@ -52,6 +53,8 @@ open class NHentai(
     final override val baseUrl = "https://nhentai.net"
 
     val apiUrl = "$baseUrl/api/v2"
+
+    private val baseUrlHost by lazy { baseUrl.toHttpUrl().host }
 
     override val id by lazy { if (lang == "all") 7309872737163460316 else super.id }
 
@@ -76,7 +79,6 @@ open class NHentai(
         val cacheDirectory = File(cacheParent, "nhentai_api_cache_$lang")
 
         network.cloudflareClient.newBuilder()
-            .rateLimitHost(baseUrl.toHttpUrl(), permits, period, TimeUnit.SECONDS)
             .cache(
                 Cache(
                     directory = cacheDirectory,
@@ -86,6 +88,7 @@ open class NHentai(
             .addInterceptor(NhApiRetryInterceptor())
             .addNetworkInterceptor(NhGalleryCacheInterceptor())
             .addNetworkInterceptor(NhAuthorizationInterceptor())
+            .rateLimit(permits, period.seconds) { it.host == baseUrlHost }
             .build()
     }
 
