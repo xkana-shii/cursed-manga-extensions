@@ -14,7 +14,7 @@ keiyoushi {
         "ja", "en", "zh", "nl", "fr",
         "de", "hu", "it", "ko", "pl",
         "pt-BR", "ru", "es", "th", "vi",
-        "none", "other",
+        "none", "other", "all",
     ).forEach { sourceLang ->
         source {
             lang = sourceLang

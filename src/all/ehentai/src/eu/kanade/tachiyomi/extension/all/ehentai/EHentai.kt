@@ -57,6 +57,7 @@ abstract class EHentai :
         "vi" -> "vietnamese"
         "none" -> "n/a"
         "other" -> "other"
+        "all" -> "all"
         else -> ""
     }
 
