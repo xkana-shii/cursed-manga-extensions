@@ -1,3 +1,4 @@
+
 package eu.kanade.tachiyomi.extension.all.ehentai
 
 import eu.kanade.tachiyomi.source.model.SManga
@@ -30,12 +31,18 @@ fun ExGalleryMetadata.copyTo(manga: SManga) {
     tags[EH_AUTHOR_NAMESPACE]?.let {
         if (it.isNotEmpty()) manga.author = it.joinToString(transform = Tag::name)
     }
-    // Set genre
-    genre?.let { manga.genre = it }
 
-    // Assign tags to genre property
-    val tagString = tags.values.flatten().joinToString { it.name }
-    manga.genre = if (manga.genre.isNullOrBlank()) tagString else "${manga.genre}, $tagString"
+    // Preserve the gallery category and use searchable namespaced tags
+    val tagGenres = tags
+        .flatMap { (namespace, tagList) ->
+            tagList.map { tag -> "$namespace:${tag.name}" }
+        }
+        .sorted()
+
+    manga.genre = (listOfNotNull(category?.takeIf(String::isNotBlank)) + tagGenres)
+        .distinct()
+        .joinToString()
+        .takeIf(String::isNotBlank)
 
     // Try to automatically identify if it is ongoing, we try not to be too lenient here to avoid making mistakes
     // We default to completed
@@ -58,6 +65,7 @@ fun ExGalleryMetadata.copyTo(manga: SManga) {
     uploader?.let { detailsDesc += "Uploader: $it\n" }
     datePosted?.let { detailsDesc += "Posted: ${EX_DATE_FORMAT.format(Date(it))}\n" }
     visible?.let { detailsDesc += "Visible: $it\n" }
+    category?.let { detailsDesc += "Category: $it\n" }
     language?.let {
         detailsDesc += "Language: $it"
         if (translated == true) detailsDesc += " TR"
@@ -72,19 +80,7 @@ fun ExGalleryMetadata.copyTo(manga: SManga) {
         detailsDesc += "\n"
     }
 
-    val tagsDesc = buildTagsDescription(this)
-
     manga.description = listOf(titleDesc.toString(), detailsDesc.toString())
         .filter(String::isNotBlank)
         .joinToString(separator = "\n")
-}
-
-private fun buildTagsDescription(metadata: ExGalleryMetadata) = StringBuilder("Tags:\n").apply {
-    // BiConsumer only available in Java 8, we have to use destructuring here
-    metadata.tags.forEach { (namespace, tags) ->
-        if (tags.isNotEmpty()) {
-            val joinedTags = tags.joinToString(separator = " ", transform = { "<${it.name}>" })
-            this += "▪ $namespace: $joinedTags\n"
-        }
-    }
 }

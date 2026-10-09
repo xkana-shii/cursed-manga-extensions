@@ -3,8 +3,7 @@ name: CI
 on:
   push:
     branches:
-      # - main
-      - master
+      - main
     paths:
       - '**'
       - '!**.md'
@@ -35,7 +34,7 @@ jobs:
       delete: ${{ steps.generate-matrices.outputs.delete }}
     steps:
       - name: Checkout ${{ github.ref_name }} branch
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -56,7 +55,7 @@ jobs:
       - id: generate-matrices
         name: Create output matrices
         run: |
-          python ./.github/scripts/generate-build-matrices.py "$NX_BASE" Release
+          python ./.github/scripts/generate-build-matrices.py "$NX_BASE"
 
   build:
     name: Build extensions (${{ matrix.chunk.number }})
@@ -68,18 +67,18 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - name: Checkout ${{ github.ref_name }} branch
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Java
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
-          java-version: 17
+          java-version: 25.0.4+101.0.LTS
           distribution: temurin
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
           cache-read-only: ${{ matrix.chunk.number > 1 }}
 
@@ -94,7 +93,11 @@ jobs:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew $MODULES
+          TASKS=()
+          for module in $MODULES; do
+            TASKS+=("${module}:assembleRelease")
+          done
+          ./gradlew "${TASKS[@]}"
 
       - name: Upload APKs (${{ matrix.chunk.number }})
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -123,7 +126,7 @@ jobs:
       needs.build.result != 'cancelled' &&
       needs.prepare.outputs.delete != '[]'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 120
     steps:
       - name: Download APK artifacts
         if: needs.build.result == 'success'
@@ -132,14 +135,14 @@ jobs:
           path: ~/apk-artifacts
 
       - name: Checkout ${{ github.ref_name }} branch
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.ref_name }}
           path: ${{ github.ref_name }}
           persist-credentials: false
 
       - name: Checkout repo branch
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: xkana-shii/manga-repo
           token: ${{ secrets.BOT_PAT }}
@@ -147,26 +150,24 @@ jobs:
           path: repo
           persist-credentials: true
 
-      - name: Publish repo
+      - name: Publish and deploy repo
         env:
+          COMMIT_MESSAGE: ${{ needs.prepare.outputs.latestCommitMessage }}
           DELETE: ${{ needs.prepare.outputs.delete }}
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
         run: |
           cd repo
           pip install protobuf
-          python ../${{ github.ref_name }}/.github/scripts/publish-repo.py "$DELETE"
-
-      - name: Deploy repo
-        uses: EndBug/add-and-commit@290ea2c423ad77ca9c62ae0f5b224379612c0321 # v10
-        with:
-          message: "${{ needs.prepare.outputs.latestCommitMessage }}"
-          cwd: "./repo"
-          # committer_name: github-actions[bot]
-          # committer_email: github-actions[bot]@users.noreply.github.com
-          default_author: github_actions
-          commit: --signoff
-
-      - name: Purge cached index on jsDelivr
-        run: |
-          curl https://purge.jsdelivr.net/gh/xkana-shii/manga-repo@repo/index.min.json
-          curl https://purge.jsdelivr.net/gh/xkana-shii/manga-repo@repo/index.json
-          curl https://purge.jsdelivr.net/gh/xkana-shii/manga-repo@repo/index.pb
+          python -u ../${{ github.ref_name }}/.github/scripts/publish-repo.py "$DELETE" "$GITHUB_SHA"
+          git config user.name "Yūzōnō"
+          git config user.email "yuzono@users.noreply.github.com"
+          git status
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "$COMMIT_MESSAGE"
+            git push
+            curl https://purge.jsdelivr.net/gh/xkana-shii/extensions@repo/index.json
+            curl https://purge.jsdelivr.net/gh/xkana-shii/extensions@repo/index.pb
+          else
+            echo "No changes to commit"
+          fi
